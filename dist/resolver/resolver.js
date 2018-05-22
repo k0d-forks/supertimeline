@@ -526,15 +526,16 @@ function resolveObjectDuration(obj, resolvedObjects) {
     var outerDuration = obj.resolved.outerDuration || null;
     var innerDuration = obj.resolved.innerDuration || null;
     if (obj['isGroup']) {
-        var obj0_1 = obj;
-        if (!_.has(obj0_1.resolved, 'outerDuration')) {
+        var obj0 = obj;
+        if (!_.has(obj0.resolved, 'outerDuration')) {
             log('RESOLVE GROUP DURATION', 'TRACE');
             var lastEndTime_1 = -1;
             var hasInfiniteDuration_1 = false;
-            if (obj0_1.content && obj0_1.content.objects) {
-                _.each(obj0_1.content.objects, function (child) {
+            if (obj0.content && obj0.content.objects) {
+                var obj0Clone_1 = clone(obj0);
+                _.each(obj0.content.objects, function (child) {
                     if (!child.parent)
-                        child.parent = clone(obj0_1);
+                        child.parent = obj0Clone_1;
                     if (!child.resolved)
                         child.resolved = {};
                     var startTime = resolveObjectStartTime(child, resolvedObjects);

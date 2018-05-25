@@ -26,7 +26,8 @@ var Resolver = /** @class */ (function () {
     Resolver.getState = function (data, time, externalFunctions) {
         var tl = resolveTimeline(data, {});
         var tld = developTimelineAroundTime(tl, time);
-        // log(tl)
+        log('tld', 'TRACE');
+        log(tld, 'TRACE');
         var state = resolveState(tld, time);
         evaluateKeyFrames(state, tld);
         if (evaluateFunctions(state, tld, externalFunctions)) {
@@ -380,21 +381,6 @@ function developTimelineAroundTime(tl, time) {
     };
     var developObj = function (objClone, givenParentObj) {
         log('developObj', 'TRACE');
-        /*
-
-        let tmpObj: TimelineResolvedObject = _.omit(objOrg,['parent'])
-        if (tmpObj.content && tmpObj.content.objects) {
-            let objects2: any = []
-
-            _.each(tmpObj.content.objects, function (o) {
-                objects2.push(_.omit(o,['parent']))
-            })
-            tmpObj.content.objects = objects2
-        }
-        let objClone: TimelineResolvedObject = clone(tmpObj)
-         */
-        // console.log('tmpObj',tmpObj.content.objects)
-        // let objClone: TimelineResolvedObject = clone(objOrg)
         objClone.resolved.innerStartTime = objClone.resolved.startTime;
         objClone.resolved.innerEndTime = objClone.resolved.endTime;
         var parentObj = givenParentObj || objClone.parent;
@@ -1117,8 +1103,12 @@ function resolveState(tld, time) {
     log('resolveState', 'TRACE');
     // log('resolveState '+time)
     var LLayers = {};
+    var GLayers = {};
     var obj;
     var obj2;
+    log('tld', 'TRACE');
+    log(tld, 'TRACE');
+    log('Resolved objects:', 'TRACE');
     for (var i = 0; i < tld.resolved.length; i++) {
         obj = _.clone(tld.resolved[i]);
         log(obj, 'TRACE');
@@ -1156,7 +1146,6 @@ function resolveState(tld, time) {
             return getGLayer(obj.parent);
         return null;
     };
-    var GLayers = {};
     for (var LLayer in LLayers) {
         obj = LLayers[LLayer];
         var GLayer = getGLayer(obj) || 0;
@@ -1173,55 +1162,122 @@ function resolveState(tld, time) {
             }
         }
     }
-    log('GLayers: ', 'TRACE');
+    log('GLayers, before logical: ', 'TRACE');
     log(GLayers, 'TRACE');
     // Logic expressions:
-    var unresolvedLogicObjs = [];
-    _.each(tld.unresolved, function (o) {
+    var groupsOnState = {};
+    var unresolvedLogicObjs = {};
+    var addLogicalObj = function (o, parent) {
         if (o.trigger.type === enums_1.TriggerType.LOGICAL) {
             // ensure there's no startTime on obj
-            if (o['resolved']) {
-                o['resolved'].startTime = null;
-                o['resolved'].endTime = null;
-                o['resolved'].duration = null;
+            var o2 = clone(o);
+            if (o2['resolved']) {
+                o2['resolved'].startTime = null;
+                o2['resolved'].endTime = null;
+                o2['resolved'].duration = null;
             }
-            unresolvedLogicObjs.push({
-                prevOnTimeline: null,
-                obj: o
+            if (parent) {
+                o2.parent = parent;
+            }
+            if (unresolvedLogicObjs[o2.id]) {
+                // already there
+                return false;
+            }
+            else {
+                unresolvedLogicObjs[o2.id] = {
+                    prevOnTimeline: null,
+                    obj: o2
+                };
+                return true;
+            }
+        }
+        return false;
+    };
+    _.each(tld.unresolved, function (o) {
+        addLogicalObj(o);
+    });
+    _.each(tld.groups, function (o) {
+        if (o.isGroup && o.content && o.content.objects) {
+            if (o.trigger.type === enums_1.TriggerType.LOGICAL) {
+                addLogicalObj(o);
+            }
+            else {
+                groupsOnState[o.id] = true;
+            }
+            _.each(o.content.objects, function (child) {
+                addLogicalObj(child, o);
             });
         }
     });
     var hasChangedSomethingInIteration = true;
-    var iterationsLeft = unresolvedLogicObjs.length;
+    var iterationsLeft = _.keys(unresolvedLogicObjs).length + 2;
+    log('unresolvedLogicObjs', 'TRACE');
+    log(unresolvedLogicObjs, 'TRACE');
+    log('Logical objects:', 'TRACE');
     while (hasChangedSomethingInIteration && iterationsLeft-- >= 0) {
         hasChangedSomethingInIteration = false;
         _.each(unresolvedLogicObjs, function (o) {
-            var onTimeLine = decipherLogicalValue(o.obj.trigger.value, o.obj, {
+            log(o, 'TRACE');
+            var onTimeLine = !!(decipherLogicalValue(o.obj.trigger.value, o.obj, {
                 time: time,
                 GLayers: GLayers,
                 LLayers: LLayers
-            });
-            if (onTimeLine && !o.obj.disabled) {
-                var oldLLobj = LLayers[o.obj.LLayer];
-                if (!oldLLobj ||
-                    (o.obj.priority || 0) > (oldLLobj.priority || 0) // o.obj has higher priority => replaces oldLLobj
-                ) {
-                    LLayers[o.obj.LLayer] = o.obj;
-                    var GLayer = getGLayer(o.obj) || 0;
-                    var oldGLObj = GLayers[GLayer];
-                    if (!oldGLObj ||
-                        oldGLObj.LLayer <= o.obj.LLayer || // maybe add some better logic here, right now we use the LLayer index as a priority (higher LLayer => higher priority)
-                        (oldLLobj && oldGLObj.id === oldLLobj.id // the old object has just been replaced
-                        )) {
-                        GLayers[GLayer] = o.obj;
+            }) && !o.obj.disabled);
+            log('onTimeLine ' + onTimeLine, 'TRACE');
+            if (o.obj.isGroup) {
+                groupsOnState[o.obj.id] = onTimeLine;
+                if (onTimeLine) {
+                    // a group isn't placed in the state, instead its children are evaluated
+                    if (o.obj.content && o.obj.content.objects) {
+                        _.each(o.obj.content.objects, function (o2) {
+                            if (addLogicalObj(o2, o.obj)) {
+                                iterationsLeft++;
+                                hasChangedSomethingInIteration = true;
+                            }
+                        });
                     }
                 }
-                if (oldLLobj && oldLLobj.id !== LLayers[o.obj.LLayer].id) {
-                    // oldLLobj has been removed from LLayers
-                    // maybe remove it from GLayers as well?
-                    var GLayer = getGLayer(o.obj) || 0;
-                    if (GLayers[GLayer].id === oldLLobj.id) {
-                        // yes, remove it:
+            }
+            else {
+                if (o.obj['parent']) {
+                    var parentId = o.obj['parent'].id;
+                    onTimeLine = (onTimeLine &&
+                        groupsOnState[parentId]);
+                }
+                var oldLLobj = LLayers[o.obj.LLayer];
+                var GLayer = getGLayer(o.obj) || 0;
+                var oldGLObj = GLayers[GLayer];
+                if (onTimeLine) {
+                    // Place in state, according to priority rules:
+                    if (!oldLLobj ||
+                        (o.obj.priority || 0) > (oldLLobj.priority || 0) // o.obj has higher priority => replaces oldLLobj
+                    ) {
+                        LLayers[o.obj.LLayer] = o.obj;
+                        if (!oldGLObj ||
+                            oldGLObj.LLayer <= o.obj.LLayer || // maybe add some better logic here, right now we use the LLayer index as a priority (higher LLayer => higher priority)
+                            (oldLLobj && oldGLObj.id === oldLLobj.id // the old object has just been replaced
+                            )) {
+                            GLayers[GLayer] = o.obj;
+                        }
+                    }
+                    if (oldLLobj && oldLLobj.id !== LLayers[o.obj.LLayer].id) {
+                        // oldLLobj has been removed from LLayers
+                        // maybe remove it from GLayers as well?
+                        var GLayer_1 = getGLayer(o.obj) || 0;
+                        if (GLayers[GLayer_1].id === oldLLobj.id) {
+                            // yes, remove it:
+                            delete GLayers[GLayer_1];
+                        }
+                    }
+                }
+                else {
+                    // Object should not be in the state
+                    if (oldLLobj && oldLLobj.id === o.obj.id) {
+                        // remove the object then:
+                        delete LLayers[o.obj.LLayer];
+                    }
+                    if (oldGLObj && oldGLObj.id === o.obj.id) {
+                        // remove the object then:
                         delete GLayers[GLayer];
                     }
                 }
@@ -1232,6 +1288,11 @@ function resolveState(tld, time) {
             }
         });
     }
+    if (iterationsLeft <= 0) {
+        log('Timeline Warning: Many Logical iterations, maybe there is a cyclic dependency?', enums_1.TraceLevel.ERRORS);
+    }
+    log('GLayers: ', 'TRACE');
+    log(GLayers, 'TRACE');
     return {
         time: time,
         GLayers: GLayers,

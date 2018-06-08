@@ -2,8 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var _ = require("underscore");
 var enums_1 = require("../enums/enums");
-// let clone = require('fast-clone')
-var clone = function (o) { return o; };
 var traceLevel = enums_1.TraceLevel.ERRORS; // 0
 var Resolver = /** @class */ (function () {
     function Resolver() {

@@ -10,8 +10,14 @@ var Resolver = /** @class */ (function () {
         var lvl = enums_1.TraceLevel.ERRORS;
         if (_.isNumber(levelName))
             lvl = levelName;
-        else if (levelName)
-            lvl = enums_1.TraceLevel[levelName] || enums_1.TraceLevel.ERRORS;
+        else if (levelName === 'ERRORS')
+            lvl = enums_1.TraceLevel.ERRORS;
+        else if (levelName === 'INFO')
+            lvl = enums_1.TraceLevel.INFO;
+        else if (levelName === 'TRACE')
+            lvl = enums_1.TraceLevel.TRACE;
+        else
+            lvl = enums_1.TraceLevel.ERRORS;
         traceLevel = lvl;
     };
     Resolver.getTraceLevel = function () {
@@ -23,10 +29,15 @@ var Resolver = /** @class */ (function () {
      * returns the current state
     */
     Resolver.getState = function (data, time, externalFunctions) {
-        var tl = resolveTimeline(data, {});
+        var tl = resolveTimeline(data, {
+        /*
+        startTime: time-1,
+        endTime: time+1,
+        */ // removed filter because evaluateKeyFrames do need the whole timeline to function
+        });
         var tld = developTimelineAroundTime(tl, time);
-        log('tld', 'TRACE');
-        log(tld, 'TRACE');
+        log('tld', enums_1.TraceLevel.TRACE);
+        log(tld, enums_1.TraceLevel.TRACE);
         var state = resolveState(tld, time);
         evaluateKeyFrames(state, tld);
         if (evaluateFunctions(state, tld, externalFunctions)) {
@@ -45,7 +56,6 @@ var Resolver = /** @class */ (function () {
         if (!count)
             count = 10;
         var i;
-        var obj;
         var tl = {
             resolved: [],
             unresolved: []
@@ -74,18 +84,19 @@ var Resolver = /** @class */ (function () {
             GLayers: {},
             time: 0
         }, tld);
-        log('getNextEvents', 'TRACE');
+        log('getNextEvents', enums_1.TraceLevel.TRACE);
         var nextEvents = [];
         var usedObjIds = {};
         // let endCount = 0
         // let startCount = 0
         for (i = 0; i < tld.resolved.length; i++) {
             // if (count>0 && startCount >= count ) break
-            obj = tld.resolved[i];
-            if (obj.resolved.endTime >= time || // the object has not already finished
+            var obj = tld.resolved[i];
+            if ((obj.resolved.endTime || 0) >= time || // the object has not already finished
                 obj.resolved.endTime === 0 // the object has no endTime
             ) {
-                if (obj.resolved.startTime >= time) {
+                if (obj.resolved.startTime &&
+                    (obj.resolved.startTime || 0) >= time) { // the object has not started yet
                     nextEvents.push({
                         type: enums_1.EventType.START,
                         time: obj.resolved.startTime,
@@ -115,8 +126,8 @@ var Resolver = /** @class */ (function () {
                 keyFrame.parent &&
                 keyFrame.resolved &&
                 keyFrame.resolved.startTime) {
-                if (keyFrame.resolved.startTime >= time) {
-                    obj = usedObjIds[keyFrame.parent];
+                if (keyFrame.resolved.startTime >= time) { // the object has not already started
+                    var obj = usedObjIds[keyFrame.parent];
                     if (obj) {
                         nextEvents.push({
                             type: enums_1.EventType.KEYFRAME,
@@ -127,7 +138,7 @@ var Resolver = /** @class */ (function () {
                     }
                 }
                 if ((keyFrame.resolved.endTime || 0) >= time) {
-                    obj = usedObjIds[keyFrame.parent];
+                    var obj = usedObjIds[keyFrame.parent];
                     if (obj) {
                         nextEvents.push({
                             type: enums_1.EventType.KEYFRAME,
@@ -167,8 +178,8 @@ var Resolver = /** @class */ (function () {
             startTime: startTime,
             endTime: endTime
         });
-        log('tl', 'TRACE');
-        log(tl, 'TRACE');
+        log('tl', enums_1.TraceLevel.TRACE);
+        log(tl, enums_1.TraceLevel.TRACE);
         return tl;
     };
     /*
@@ -181,11 +192,11 @@ var Resolver = /** @class */ (function () {
             startTime: startTime,
             endTime: endTime
         });
-        // log('tl','TRACE')
-        // log(tl,'TRACE')
+        // log('tl',TraceLevel.TRACE)
+        // log(tl,TraceLevel.TRACE)
         var tld = developTimelineAroundTime(tl, startTime);
-        // log('tld','TRACE')
-        // log(tld,'TRACE')
+        // log('tld',TraceLevel.TRACE)
+        // log(tld,TraceLevel.TRACE)
         return tld;
     };
     // Other exposed functionality:
@@ -238,13 +249,14 @@ function resolveTimeline(data, filter) {
         throw Error('resolveFullTimeline: parameter data missing!');
     // check: if data is infact a resolved timeline, then just return it:
     var unresolvedData;
-    if (_.isObject(data) && data['resolved'] && data['unresolved']) {
+    // @ts-ignore check if resolved / unresolved exists on object
+    if (_.isObject(data) && data.resolved && data.unresolved) {
         return data;
     }
     else {
         unresolvedData = data;
     }
-    log('resolveTimeline', 'TRACE');
+    log('resolveTimeline', enums_1.TraceLevel.TRACE);
     // Start resolving the triggers, i.e. resolve them into absolute times on the timeline:
     var resolvedObjects = {};
     var unresolvedObjects = [];
@@ -282,17 +294,17 @@ function resolveTimeline(data, filter) {
         }
         return obj;
     });
-    log('======= resolveTimeline: Starting iterating... ==============', 'TRACE');
+    log('======= resolveTimeline: Starting iterating... ==============', enums_1.TraceLevel.TRACE);
     var hasAddedAnyObjects = true;
     while (hasAddedAnyObjects) {
         hasAddedAnyObjects = false;
-        log('======= Iterating objects...', 'TRACE');
+        log('======= Iterating objects...', enums_1.TraceLevel.TRACE);
         for (var i = 0; i < unresolvedObjects.length; i++) {
             var obj = _.extend(_.clone(unresolvedObjects[i]), {
                 resolved: {}
             });
             if (obj) {
-                log('--------------- object ' + obj.id, 'TRACE');
+                log('--------------- object ' + obj.id, enums_1.TraceLevel.TRACE);
                 // if (!obj.resolved) obj.resolved = {}
                 if (obj.disabled)
                     obj.resolved.disabled = true;
@@ -305,21 +317,21 @@ function resolveTimeline(data, filter) {
                     triggerTime = null;
                 }
                 if (triggerTime) {
-                    log('resolved object ' + i, 'TRACE');
+                    log('resolved object ' + i, enums_1.TraceLevel.TRACE);
                     var outerDuration = resolveObjectDuration(obj, resolvedObjects);
-                    if (!_.isNull(outerDuration) && !_.isNull(obj.resolved.innerDuration)) {
+                    if (outerDuration !== null && obj.resolved.innerDuration !== null) {
                         resolvedObjects[obj.id] = obj;
                         unresolvedObjects.splice(i, 1);
                         i--;
                         hasAddedAnyObjects = true; // this will cause the iteration to run again
                     }
                     else {
-                        log('no duration', 'TRACE');
-                        log('outerDuration: ' + outerDuration, 'TRACE');
+                        log('no duration', enums_1.TraceLevel.TRACE);
+                        log('outerDuration: ' + outerDuration, enums_1.TraceLevel.TRACE);
                     }
                 }
                 // log(obj)
-                log(obj, 'TRACE');
+                log(obj, enums_1.TraceLevel.TRACE);
             }
         }
     }
@@ -358,7 +370,7 @@ function resolveTimeline(data, filter) {
  */
 function developTimelineAroundTime(tl, time) {
     // extract group & inner content around a given time
-    log('developTimelineAroundTime ' + time, 'TRACE');
+    log('developTimelineAroundTime ' + time, enums_1.TraceLevel.TRACE);
     // let resolvedObjects = {}
     var tl2 = {
         resolved: [],
@@ -375,20 +387,20 @@ function developTimelineAroundTime(tl, time) {
 function getParentTime(obj) {
     var time = 0;
     if (_.has(obj.resolved, 'repeatingStartTime') &&
-        !_.isNull(obj.resolved.repeatingStartTime)) {
+        obj.resolved.repeatingStartTime) {
         time = obj.resolved.repeatingStartTime;
     }
     else if (obj.resolved.startTime) {
         time = obj.resolved.startTime;
     }
     if (obj.parent) {
-        time += getParentTime(obj.parent) - obj.parent.resolved.startTime;
+        time += getParentTime(obj.parent) - (obj.parent.resolved.startTime || 0);
     }
     return time;
 }
 function developObj(tl2, time, objOrg, givenParentObj) {
     // Develop and place on tl2:
-    log('developObj', 'TRACE');
+    log('developObj', enums_1.TraceLevel.TRACE);
     var returnObj = _.clone(objOrg);
     returnObj.resolved = _.clone(returnObj.resolved);
     returnObj.resolved.innerStartTime = returnObj.resolved.startTime;
@@ -400,7 +412,7 @@ function developObj(tl2, time, objOrg, givenParentObj) {
         parentTime = getParentTime(parentObj);
         returnObj.resolved.parentId = parentObj.id;
         parentIsRepeating = (_.has(parentObj.resolved, 'repeatingStartTime') &&
-            !_.isNull(parentObj.resolved.repeatingStartTime));
+            parentObj.resolved.repeatingStartTime !== null);
     }
     returnObj.resolved.startTime = (returnObj.resolved.startTime || 0) + parentTime;
     if (returnObj.resolved.endTime) {
@@ -436,16 +448,16 @@ function developObj(tl2, time, objOrg, givenParentObj) {
         returnObj.resolved.startTime = null;
         returnObj.resolved.endTime = null;
     }
-    log(returnObj, 'TRACE');
+    log(returnObj, enums_1.TraceLevel.TRACE);
     if (returnObj.repeating) {
-        log('Repeating', 'TRACE');
+        log('Repeating', enums_1.TraceLevel.TRACE);
         // let outerDuration = objNOTClone.resolved.outerDuration;
         if (!returnObj.resolved.innerDuration)
             throw Error('Object "#' + returnObj.id + '" is repeating but missing innerDuration!');
-        log('time: ' + time, 'TRACE');
-        log('innerDuration: ' + returnObj.resolved.innerDuration, 'TRACE');
+        log('time: ' + time, enums_1.TraceLevel.TRACE);
+        log('innerDuration: ' + returnObj.resolved.innerDuration, enums_1.TraceLevel.TRACE);
         var repeatingStartTime = Math.max((returnObj.resolved.startTime || 0), time - ((time - (returnObj.resolved.startTime || 0)) % returnObj.resolved.innerDuration)); // This is the startTime closest to, and before, time
-        log('repeatingStartTime: ' + repeatingStartTime, 'TRACE');
+        log('repeatingStartTime: ' + repeatingStartTime, enums_1.TraceLevel.TRACE);
         returnObj.resolved.repeatingStartTime = repeatingStartTime;
     }
     if (returnObj.isGroup) {
@@ -483,7 +495,7 @@ function resolveObjectStartTime(obj, resolvedObjects) {
     }
     else if (obj.trigger.type === enums_1.TriggerType.TIME_RELATIVE) {
         // ooh, it's a relative time! Relative to what, one might ask? Let's find out:
-        if (!_.has(obj.resolved, 'startTime') || _.isNull(obj.resolved.startTime)) {
+        if (!_.has(obj.resolved, 'startTime') || obj.resolved.startTime === null) {
             var o = decipherTimeRelativeValue(obj.trigger.value + '', resolvedObjects);
             obj.resolved.startTime = (o ? o.value : null);
             obj.resolved.referralIndex = (o ? o.referralIndex : null);
@@ -513,15 +525,16 @@ function resolveObjectDuration(obj, resolvedObjects) {
         obj.resolved = {};
     var outerDuration = obj.resolved.outerDuration || null;
     var innerDuration = obj.resolved.innerDuration || null;
-    if (obj['isGroup']) {
+    // @ts-ignore check if object is a group
+    if (obj.isGroup) {
         var obj0_1 = obj;
         if (!_.has(obj.resolved, 'outerDuration')) {
-            log('RESOLVE GROUP DURATION', 'TRACE');
+            log('RESOLVE GROUP DURATION', enums_1.TraceLevel.TRACE);
             var lastEndTime_1 = -1;
             var hasInfiniteDuration_1 = false;
             if (obj.content && obj.content.objects) {
                 // let obj = clone(obj)
-                if (!obj.content.hasClonedChildren) {
+                if (!obj.content.hasClonedChildren) { // we should clone out children, so that we wont affect the original objects
                     obj.content.hasClonedChildren = true;
                     obj.content.objects = _.map(obj.content.objects, function (o) {
                         var o2 = _.clone(o);
@@ -536,10 +549,10 @@ function resolveObjectDuration(obj, resolvedObjects) {
                         child.resolved = {};
                     var startTime = resolveObjectStartTime(child, resolvedObjects);
                     var outerDuration0 = resolveObjectDuration(child, resolvedObjects);
-                    if (!_.isNull(startTime) && !_.isNull(outerDuration0) && !_.isNull(child.resolved.innerDuration)) {
+                    if (startTime !== null && outerDuration0 !== null && child.resolved.innerDuration !== null) {
                         resolvedObjects[child.id] = child;
                     }
-                    log(child, 'TRACE');
+                    log(child, enums_1.TraceLevel.TRACE);
                     if (child.resolved.endTime === 0) {
                         hasInfiniteDuration_1 = true;
                     }
@@ -560,7 +573,7 @@ function resolveObjectDuration(obj, resolvedObjects) {
                 obj.duration :
                 (lastEndTime_1 || 0));
             obj.resolved.outerDuration = outerDuration;
-            log('GROUP DURATION: ' + obj.resolved.innerDuration + ', ' + obj.resolved.outerDuration, 'TRACE');
+            log('GROUP DURATION: ' + obj.resolved.innerDuration + ', ' + obj.resolved.outerDuration, enums_1.TraceLevel.TRACE);
         }
     }
     else {
@@ -589,8 +602,8 @@ function resolveObjectEndTime(obj, resolvedObjects) {
     var endTime = obj.resolved.endTime || null;
     if (_.has(obj.resolved, 'startTime') &&
         _.has(obj.resolved, 'outerDuration') &&
-        !_.isNull(obj.resolved.startTime) &&
-        !_.isNull(obj.resolved.outerDuration)) {
+        obj.resolved.startTime !== null &&
+        obj.resolved.outerDuration !== null) {
         if (obj.resolved.outerDuration) {
             endTime = (obj.resolved.startTime || 0) + obj.resolved.outerDuration;
         }
@@ -636,17 +649,16 @@ function interpretExpression(strOrExpr, isLogical) {
                     words.splice(i + 1, 1);
                 }
             }
-            // wrap up parentheses:
+            // wrap content within parentheses:
             var wrapInnerExpressions_1 = function (words) {
                 for (var i = 0; i < words.length; i++) {
-                    // if (words[i] == ')') throw 'decipherTimeRelativeValue: syntax error: ')' encountered.'
                     if (words[i] === '(') {
                         var tmp_1 = wrapInnerExpressions_1(words.slice(i + 1));
                         // insert inner expression and remove tha
                         words[i] = tmp_1.inner;
                         words.splice(i + 1, tmp_1.inner.length + 1);
                     }
-                    if (words[i] === ')') {
+                    else if (words[i] === ')') {
                         return {
                             inner: words.slice(0, i),
                             rest: words.slice(i + 1)
@@ -673,18 +685,7 @@ function interpretExpression(strOrExpr, isLogical) {
                     return words[0];
                 // priority order: /, *, -, +
                 var operatorI = -1;
-                /*if (operatorI == -1) {
-
-                    for (let i in words) {
-                        if (words[i] == '+' || words[i] == '-') {
-                            operatorI = parseInt(i)
-                            break
-                        }
-                    }
-                }
-                if (operatorI == -1) operatorI = words.indexOf('*')
-                if (operatorI == -1) operatorI = words.indexOf('/')
-                */
+                // Find the operator with the highest priority:
                 _.each(operatorList, function (operator) {
                     if (operatorI === -1) {
                         operatorI = words.indexOf(operator);
@@ -738,8 +739,8 @@ function interpretExpression(strOrExpr, isLogical) {
         var errStr = JSON.stringify(expression);
         throw Error(errStr + ' ' + e);
     }
-    log('expression: ', 'TRACE');
-    log(expression, 'TRACE');
+    log('expression: ', enums_1.TraceLevel.TRACE);
+    log(expression, enums_1.TraceLevel.TRACE);
     /*
         Example:
         expression = {
@@ -771,15 +772,15 @@ function resolveExpression(expression0, resolvedObjects, ctx) {
     };
     if (_.isObject(expression0)) {
         var expression = expression0;
-        log('resolveExpression', 'TRACE');
+        log('resolveExpression', enums_1.TraceLevel.TRACE);
         var l = resolveExpression(expression.l, resolvedObjects, ctx);
         var r = resolveExpression(expression.r, resolvedObjects, ctx);
-        log('l: ' + l, 'TRACE');
-        log('o: ' + expression.o, 'TRACE');
-        log('r: ' + r, 'TRACE');
-        if (_.isNull(l))
+        log('l: ' + l, enums_1.TraceLevel.TRACE);
+        log('o: ' + expression.o, enums_1.TraceLevel.TRACE);
+        log('r: ' + r, enums_1.TraceLevel.TRACE);
+        if (l === null)
             return null;
-        if (_.isNull(r))
+        if (r === null)
             return null;
         if (expression.o === '+')
             return l + r;
@@ -801,7 +802,7 @@ function resolveExpression(expression0, resolvedObjects, ctx) {
         }
         else {
             var expression = expression0 + '';
-            if (expression[0] === '#') {
+            if (expression[0] === '#') { // Referring to an other object: '#id-of-object'
                 if (_.has(ctx.touchedObjectExpressions, expression))
                     return ctx.touchedObjectExpressions[expression]; // to improve performance and avoid circular dependencies
                 ctx.touchedObjectExpressions[expression] = null; // to avoid circular dependencies
@@ -817,7 +818,7 @@ function resolveExpression(expression0, resolvedObjects, ctx) {
                 });
                 var obj = resolvedObjects[words[0]];
                 if (!obj) {
-                    log('obj "' + words[0] + '" not found', 'TRACE');
+                    log('obj "' + words[0] + '" not found', enums_1.TraceLevel.TRACE);
                     return null;
                 }
                 var referredObjValue = (_.has(obj.resolved, 'startTime') ?
@@ -855,23 +856,25 @@ function resolveLogicalExpression(expressionOrString, obj, returnExpl, currentSt
     // todo:
     if (_.isObject(expressionOrString) && expressionOrString) {
         var expression = expressionOrString;
-        log('resolveLogicalExpression', 'TRACE');
+        log('resolveLogicalExpression', enums_1.TraceLevel.TRACE);
         var l = resolveLogicalExpression(expression.l, obj, returnExpl, currentState);
         var r = resolveLogicalExpression(expression.r, obj, returnExpl, currentState);
-        log('l: ' + l, 'TRACE');
-        log('o: ' + expression.o, 'TRACE');
-        log('r: ' + r, 'TRACE');
-        if (_.isNull(l) || _.isNull(r)) {
-            if (returnExpl)
-                return '-null-';
-            return null;
-        }
+        log('l: ' + l, enums_1.TraceLevel.TRACE);
+        log('o: ' + expression.o, enums_1.TraceLevel.TRACE);
+        log('r: ' + r, enums_1.TraceLevel.TRACE);
+        // if (l === null || r === null) {
+        // 	// @ts-ignore return string is debug only
+        // 	if (returnExpl) return '-null-'
+        // 	return null
+        // }
         if (expression.o === '&') {
+            // @ts-ignore return string is debug only
             if (returnExpl)
                 return l + ' and ' + r;
             return l && r;
         }
         if (expression.o === '|') {
+            // @ts-ignore return string is debug only
             if (returnExpl)
                 return l + ' and ' + r;
             return l || r;
@@ -934,10 +937,11 @@ function resolveLogicalExpression(expressionOrString, obj, returnExpl, currentSt
                         if (!isNumeric(m[2])) {
                             err = m[2];
                         }
-                        if ((m[1] || '').match(/L/i)) {
+                        if ((m[1] || '').match(/L/i)) { // LLayer
                             var LLayer = (m[2] ?
                                 m[2] :
-                                (obj || {})['LLayer'] || null);
+                                // @ts-ignore
+                                (obj || {}).LLayer || null);
                             // log('obj on LL '+LLayer)
                             // log(currentState.LLayers[LLayer])
                             if (LLayer) {
@@ -952,10 +956,11 @@ function resolveLogicalExpression(expressionOrString, obj, returnExpl, currentSt
                                 explAdd.push('my LLayer');
                             }
                         }
-                        else if ((m[1] || '').match(/G/i)) {
+                        else if ((m[1] || '').match(/G/i)) { // GLayer
                             var GLayer = (m[2] ?
                                 m[2] :
-                                ((obj || {})['content'] || { GLayer: null }).GLayer);
+                                // @ts-ignore
+                                ((obj || {}).content || { GLayer: null }).GLayer);
                             if (GLayer) {
                                 if (currentState && currentState.GLayers[GLayer]) {
                                     objsToCheck.push(currentState.GLayers[GLayer]);
@@ -994,7 +999,7 @@ function resolveLogicalExpression(expressionOrString, obj, returnExpl, currentSt
                 found = true;
                 _.each(filterRemove, function (remove) {
                     var obj;
-                    if (remove.t === '#') {
+                    if (remove.t === '#') { // id of an object
                         explRemove.push('id "' + remove.val + '"');
                         obj = _.find(objsToCheck, function (obj) {
                             return obj.id === remove.val;
@@ -1002,7 +1007,7 @@ function resolveLogicalExpression(expressionOrString, obj, returnExpl, currentSt
                         if (!obj)
                             found = false;
                     }
-                    else if (remove.t === '.') {
+                    else if (remove.t === '.') { // class of an object
                         explRemove.push('class "' + remove.val + '"');
                         obj = _.find(objsToCheck, function (obj) {
                             return ((obj.classes || []).indexOf(remove.val) !== -1);
@@ -1025,13 +1030,16 @@ function resolveLogicalExpression(expressionOrString, obj, returnExpl, currentSt
             var expl = explJoin(explRemove, ', ', ' and ') + ' is playing on ' + explJoin(explAdd, ', ', ' or ');
             if (err)
                 throw Error('Unknown logical expression: "' + str + '" ("' + err + '")');
+            // @ts-ignore return string is debug only
             if (returnExpl)
                 return expl;
             return found;
         })(str, obj, returnExpl);
         if (returnExpl) {
+            // @ts-ignore return string is debug only
             if (invert)
                 return 'if not ' + value;
+            // @ts-ignore return string is debug only
             return 'if ' + value;
         }
         if (invert)
@@ -1039,15 +1047,18 @@ function resolveLogicalExpression(expressionOrString, obj, returnExpl, currentSt
         return value;
     }
     else if (_.isNumber(expressionOrString)) {
+        return !!expressionOrString;
+    }
+    else if (_.isBoolean(expressionOrString)) {
         return expressionOrString;
     }
-    return null;
+    throw Error('resolveLogicalExpression: unknown input: ' + expressionOrString + ' ');
 }
 function decipherTimeRelativeValue(str, resolvedObjects) {
     // Decipher a value related to the trigger type TIME_RELATIVE
     // Examples:
     // #asdf.end -2 // Relative to object asdf's end (plus 2 seconds)
-    log('decipherTimeRelativeValue', 'TRACE');
+    log('decipherTimeRelativeValue', enums_1.TraceLevel.TRACE);
     try {
         var resolveExpressionContext = {
             touchedObjectExpressions: {},
@@ -1095,11 +1106,9 @@ function decipherLogicalValue(str, obj, currentState, returnExpl) {
         }
 
     */
-    log('decipherLogicalValue', 'TRACE');
+    log('decipherLogicalValue', enums_1.TraceLevel.TRACE);
     // let referralIndex = 0
     try {
-        // let touchedObjectExpressions = {}
-        // let touchedObjectIDs = []
         var expression = interpretExpression(str, true);
         // resolve expression
         return resolveLogicalExpression(expression, obj, returnExpl, currentState);
@@ -1110,21 +1119,21 @@ function decipherLogicalValue(str, obj, currentState, returnExpl) {
     }
 }
 function resolveState(tld, time) {
-    log('resolveState', 'TRACE');
+    log('resolveState', enums_1.TraceLevel.TRACE);
     // log('resolveState '+time)
     var LLayers = {};
     var GLayers = {};
     var obj;
     var obj2;
-    log('tld', 'TRACE');
-    log(tld, 'TRACE');
-    log('Resolved objects:', 'TRACE');
+    log('tld', enums_1.TraceLevel.TRACE);
+    log(tld, enums_1.TraceLevel.TRACE);
+    log('Resolved objects:', enums_1.TraceLevel.TRACE);
     for (var i = 0; i < tld.resolved.length; i++) {
         obj = _.clone(tld.resolved[i]);
-        log(obj, 'TRACE');
-        if ((obj.resolved.endTime > time ||
+        log(obj, enums_1.TraceLevel.TRACE);
+        if (((obj.resolved.endTime || 0) > time ||
             obj.resolved.endTime === 0) &&
-            obj.resolved.startTime <= time &&
+            (obj.resolved.startTime || 0) <= time &&
             !obj.resolved.disabled) {
             // log(obj)
             if (!LLayers[obj.LLayer]) {
@@ -1135,18 +1144,18 @@ function resolveState(tld, time) {
                 obj2 = LLayers[obj.LLayer];
                 if (((obj.priority || 0) > (obj2.priority || 0) // obj has higher priority => replaces obj2
                 ) || ((obj.priority || 0) === (obj2.priority || 0) &&
-                    obj.resolved.startTime > obj2.resolved.startTime // obj starts later => replaces obj2
+                    (obj.resolved.startTime || 0) > (obj2.resolved.startTime || 0) // obj starts later => replaces obj2
                 ) || ((obj.priority || 0) === (obj2.priority || 0) &&
                     obj.resolved.startTime === obj2.resolved.startTime &&
-                    obj.resolved.referralIndex > obj2.resolved.referralIndex // obj has a higher referralIndex => replaces obj2
+                    (obj.resolved.referralIndex || 0) > (obj2.resolved.referralIndex || 0) // obj has a higher referralIndex => replaces obj2
                 )) {
                     LLayers[obj.LLayer] = obj;
                 }
             }
         }
     }
-    log('LLayers: ', 'TRACE');
-    log(LLayers, 'TRACE');
+    log('LLayers: ', enums_1.TraceLevel.TRACE);
+    log(LLayers, enums_1.TraceLevel.TRACE);
     var getGLayer = function (obj) {
         if (_.has(obj.content, 'GLayer'))
             return obj.content.GLayer;
@@ -1158,8 +1167,8 @@ function resolveState(tld, time) {
     };
     for (var LLayer in LLayers) {
         obj = LLayers[LLayer];
-        var GLayer = getGLayer(obj) || 0;
-        if (!_.isNull(GLayer)) {
+        var GLayer = getGLayer(obj);
+        if (GLayer !== null) {
             if (!GLayers[GLayer]) {
                 GLayers[GLayer] = obj;
             }
@@ -1172,8 +1181,8 @@ function resolveState(tld, time) {
             }
         }
     }
-    log('GLayers, before logical: ', 'TRACE');
-    log(GLayers, 'TRACE');
+    log('GLayers, before logical: ', enums_1.TraceLevel.TRACE);
+    log(GLayers, enums_1.TraceLevel.TRACE);
     // Logic expressions:
     var groupsOnState = {};
     var unresolvedLogicObjs = {};
@@ -1182,10 +1191,10 @@ function resolveState(tld, time) {
             // ensure there's no startTime on obj
             var o = _.clone(oOrg);
             o.content = _.clone(o.content);
-            if (o['resolved']) {
-                o['resolved'].startTime = null;
-                o['resolved'].endTime = null;
-                o['resolved'].duration = null;
+            if (o.resolved) {
+                o.resolved.startTime = null;
+                o.resolved.endTime = null;
+                o.resolved.duration = null;
             }
             if (parent) {
                 o.parent = parent;
@@ -1223,19 +1232,19 @@ function resolveState(tld, time) {
     });
     var hasChangedSomethingInIteration = true;
     var iterationsLeft = _.keys(unresolvedLogicObjs).length + 2;
-    log('unresolvedLogicObjs', 'TRACE');
-    log(unresolvedLogicObjs, 'TRACE');
-    log('Logical objects:', 'TRACE');
+    log('unresolvedLogicObjs', enums_1.TraceLevel.TRACE);
+    log(unresolvedLogicObjs, enums_1.TraceLevel.TRACE);
+    log('Logical objects:', enums_1.TraceLevel.TRACE);
     while (hasChangedSomethingInIteration && iterationsLeft-- >= 0) {
         hasChangedSomethingInIteration = false;
         _.each(unresolvedLogicObjs, function (o) {
-            log(o, 'TRACE');
+            log(o, enums_1.TraceLevel.TRACE);
             var onTimeLine = !!(decipherLogicalValue(o.obj.trigger.value, o.obj, {
                 time: time,
                 GLayers: GLayers,
                 LLayers: LLayers
             }) && !o.obj.disabled);
-            log('onTimeLine ' + onTimeLine, 'TRACE');
+            log('onTimeLine ' + onTimeLine, enums_1.TraceLevel.TRACE);
             if (o.obj.isGroup) {
                 groupsOnState[o.obj.id] = onTimeLine;
                 if (onTimeLine) {
@@ -1251,8 +1260,8 @@ function resolveState(tld, time) {
                 }
             }
             else {
-                if (o.obj['parent']) {
-                    var parentId = o.obj['parent'].id;
+                if (o.obj.parent) {
+                    var parentId = o.obj.parent.id;
                     onTimeLine = (onTimeLine &&
                         groupsOnState[parentId]);
                 }
@@ -1303,8 +1312,8 @@ function resolveState(tld, time) {
     if (iterationsLeft <= 0) {
         log('Timeline Warning: Many Logical iterations, maybe there is a cyclic dependency?', enums_1.TraceLevel.ERRORS);
     }
-    log('GLayers: ', 'TRACE');
-    log(GLayers, 'TRACE');
+    log('GLayers: ', enums_1.TraceLevel.TRACE);
+    log(GLayers, enums_1.TraceLevel.TRACE);
     return {
         time: time,
         GLayers: GLayers,
@@ -1415,7 +1424,7 @@ function evaluateKeyFrames(state, tld) {
                                 }
                                 _.each(val, function (val1, attr) {
                                     // Apply keyframe to content:
-                                    if (state.time) {
+                                    if (state.time) { // if no time is given, then don't apply
                                         // obj.resolved.mixer[attr] = val1
                                         obj.resolved[key][attr] = val1;
                                     }

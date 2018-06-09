@@ -20,6 +20,8 @@ export interface TimelineObject {
     externalFunction?: string;
 }
 export interface TimelineGroup extends TimelineObject {
+    resolved: ResolvedDetails;
+    parent?: TimelineGroup;
 }
 export declare type TimeMaybe = number | null;
 export declare type StartTime = number | null;
@@ -47,7 +49,7 @@ export interface TimelineKeyframe {
 }
 export interface TimelineResolvedObject extends TimelineObject {
     resolved: ResolvedDetails;
-    parent?: TimelineResolvedObject;
+    parent?: TimelineGroup;
 }
 export interface TimelineResolvedKeyframe extends TimelineKeyframe {
     resolved: ResolvedDetails;
@@ -114,11 +116,11 @@ declare class Resolver {
     static getNextEvents(data: ResolvedTimeline, time: SomeTime, count?: number): TimelineEvent[];
     static getTimelineInWindow(data: UnresolvedTimeline, startTime?: StartTime, endTime?: EndTime): ResolvedTimeline;
     static getObjectsInWindow(data: UnresolvedTimeline, startTime: SomeTime, endTime?: SomeTime): DevelopedTimeline;
-    static interpretExpression(strOrExpr: any, isLogical?: boolean): string | number | ExpressionObj | null;
-    static resolveExpression(strOrExpr: any, resolvedObjects?: ResolvedObjectsStore, ctx?: ResolveExpressionContext): any;
-    static resolveLogicalExpression(expressionOrString: Expression | null, obj?: TimelineResolvedObject, returnExpl?: boolean, currentState?: TimelineState): any;
+    static interpretExpression(strOrExpr: string | number | Expression, isLogical?: boolean): string | number | ExpressionObj | null;
+    static resolveExpression(strOrExpr: string | number | Expression, resolvedObjects?: ResolvedObjectsStore, ctx?: ResolveExpressionContext): StartTime;
+    static resolveLogicalExpression(expressionOrString: Expression | null, obj?: TimelineResolvedObject, returnExpl?: boolean, currentState?: TimelineState): boolean;
     static developTimelineAroundTime(tl: ResolvedTimeline, time: SomeTime): DevelopedTimeline;
-    static decipherLogicalValue(str: any, obj: any, currentState: any, returnExpl?: boolean): string | boolean;
+    static decipherLogicalValue(str: string | number, obj: TimelineObject | TimelineKeyframe, currentState: TimelineState, returnExpl?: boolean): boolean | string;
 }
 export interface ResolveExpressionContext {
     touchedObjectExpressions: {

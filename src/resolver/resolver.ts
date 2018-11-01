@@ -2,36 +2,11 @@
 import * as _ from 'underscore'
 
 import { TriggerType, TraceLevel, EventType } from '../enums/enums'
+import { TimelineObject, TimelineKeyframe, ObjectId } from './timeline'
 
 let traceLevel: TraceLevel = TraceLevel.ERRORS // 0
 const throwErrors: boolean = false
-export interface TimelineObject {
-	id: ObjectId,
-	trigger: {
-		type: TriggerType,
-		value: number | string
-	},
-	duration?: number | string,
-	LLayer: string | number,
-	content: {
-		objects?: Array<TimelineObject>,
 
-		keyframes?: Array<TimelineKeyframe>,
-		// templateData?: any,
-
-		[key: string]: any
-	},
-	classes?: Array<string>
-	disabled?: boolean,
-	isGroup?: boolean,
-	repeating?: boolean,
-	priority?: number,
-	externalFunction?: string
-}
-export interface TimelineGroup extends TimelineObject {
-	resolved: ResolvedDetails
-	parent?: TimelineGroup
-}
 export type TimeMaybe = number | null
 
 export type StartTime = number | null
@@ -39,27 +14,15 @@ export type EndTime = number | null
 export type Duration = number | null
 export type SomeTime = number
 
-export type ObjectId = string
-
+export interface TimelineGroup extends TimelineObject {
+	resolved: ResolvedDetails
+	parent?: TimelineGroup
+}
 export interface TimelineEvent {
 	type: EventType,
 	time: SomeTime,
 	obj: TimelineObject,
 	kf?: TimelineResolvedKeyframe
-}
-export interface TimelineKeyframe {
-	id: string,
-	trigger: {
-		type: TriggerType,
-		value: number | string
-	},
-	duration?: number | string,
-	content?: {
-
-		// templateData?: any,
-		[key: string]: any
-	},
-	classes?: Array<string>
 }
 interface UnresolvedLogicObject {
 	prevOnTimeline?: string | boolean | null,
